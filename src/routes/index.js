@@ -2,16 +2,16 @@ const express = require('express');
 const router = express.Router();
 
 // Import all route modules
-const authRoutes = require('./authRoutes');
-const organizationRoutes = require('./organizationRoutes');
-const userRoutes = require('./userRoutes');
-const customerRoutes = require('./customerRoutes');
-const warehouseCostRoutes = require('./warehouseCostRoutes');
-const routeRoutes = require('./routeRoutes');
-const transportCostRoutes = require('./transportCostRoutes');
-const orderRoutes = require('./orderRoutes');
-const costResultRoutes = require('./costResultRoutes');
-const dropSizeResultRoutes = require('./dropSizeResultRoutes');
+const authRoutes = require('./auth/authRoutes');
+const organizationRoutes = require('./auth/organizationRoutes');
+const userRoutes = require('./auth/userRoutes');
+const customerRoutes = require('./core/customerRoutes');
+const routeRoutes = require('./core/routeRoutes');
+const warehouseCostRoutes = require('./costs/warehouseCostRoutes');
+const transportCostRoutes = require('./costs/transportCostRoutes');
+const orderRoutes = require('./orders/orderRoutes');
+const costResultRoutes = require('./results/costResultRoutes');
+const dropSizeResultRoutes = require('./results/dropSizeResultRoutes');
 
 // Mount routes
 router.use('/auth', authRoutes);

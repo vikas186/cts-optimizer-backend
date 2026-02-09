@@ -1,13 +1,20 @@
 require('dotenv').config();
 const app = require('./src/app');
 const sequelize = require('./src/config/database');
+const models = require('./src/models');
 
 const PORT = process.env.PORT || 3000;
 
-// Test database connection
+// Test database connection and sync models
 sequelize.authenticate()
   .then(() => {
     console.log('Database connection has been established successfully.');
+    
+    // Sync database using ALTER (updates existing tables without dropping data)
+    return sequelize.sync({ alter: true });
+  })
+  .then(() => {
+    console.log('Database models synchronized successfully.');
     
     // Start server
     app.listen(PORT, () => {

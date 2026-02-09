@@ -355,8 +355,7 @@ const options = {
           type: 'object',
           properties: {
             success: {
-              type: 'boolean',
-              example: false
+              type: 'boolean'
             },
             error: {
               type: 'string',
@@ -368,8 +367,7 @@ const options = {
           type: 'object',
           properties: {
             success: {
-              type: 'boolean',
-              example: true
+              type: 'boolean'
             },
             data: {
               type: 'object'
