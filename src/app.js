@@ -4,7 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
-const errorHandler = require('./middleware/errorHandler');
+const errorHandler = require('./middleware/common/errorHandler');
 const routes = require('./routes');
 
 const app = express();
@@ -28,8 +28,36 @@ if (process.env.NODE_ENV === 'development') {
 
 // Swagger Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'CTS Optimizer API Documentation'
+  customCss: `
+    .swagger-ui .topbar { display: none }
+    .swagger-ui .example-value { display: none !important }
+    .swagger-ui .model-example { display: none !important }
+    .swagger-ui .response-example { display: none !important }
+    .swagger-ui .highlight-code { display: none !important }
+    .swagger-ui .microlight { display: none !important }
+    .swagger-ui .renderedMarkdown pre { display: none !important }
+    .swagger-ui .opblock-body pre { display: none !important }
+    .swagger-ui .opblock-body .highlight-code { display: none !important }
+    .swagger-ui .response-col_description { display: none }
+    .swagger-ui .response-col_links { display: none }
+    .swagger-ui .response-content-type { display: none }
+    .swagger-ui .response .example { display: none !important }
+    .swagger-ui .response .examples { display: none !important }
+    .swagger-ui .response .example-wrapper { display: none !important }
+    .swagger-ui .response .example-value-wrapper { display: none !important }
+  `,
+  customSiteTitle: 'CTS Optimizer API Documentation',
+  swaggerOptions: {
+    defaultModelsExpandDepth: -1,
+    defaultModelExpandDepth: -1,
+    displayRequestDuration: true,
+    docExpansion: 'list',
+    filter: true,
+    showExtensions: false,
+    showCommonExtensions: false,
+    tryItOutEnabled: true,
+    requestSnippetsEnabled: false
+  }
 }));
 
 // Routes
@@ -52,10 +80,8 @@ app.use('/api', routes);
  *               properties:
  *                 success:
  *                   type: boolean
- *                   example: true
  *                 message:
  *                   type: string
- *                   example: Server is running
  */
 app.get('/health', (req, res) => {
   res.status(200).json({

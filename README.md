@@ -19,7 +19,6 @@ cts-optimizer-backend/
 ├── src/
 │   ├── config/          # Configuration files
 │   ├── models/          # Sequelize models
-│   ├── migrations/      # Database migrations
 │   ├── controllers/     # Route controllers
 │   ├── services/        # Business logic layer
 │   ├── routes/          # API routes
@@ -74,11 +73,6 @@ JWT_EXPIRE=7d
 createdb cts_optimizer
 ```
 
-6. Run database migrations:
-```bash
-npm run migrate
-```
-
 ## Running the Application
 
 ### Development Mode
@@ -92,6 +86,8 @@ npm start
 ```
 
 The server will start on `http://localhost:3000` (or the port specified in your `.env` file).
+
+**Note:** The database schema will be automatically synchronized with your models using `ALTER TABLE` statements when the server starts. This ensures your database structure matches your Sequelize models without requiring manual migrations.
 
 ## API Documentation
 
@@ -197,22 +193,16 @@ The system includes the following models:
 8. **CostResults** - Calculated cost results
 9. **DropSizeResults** - Drop size optimization results
 
-## Database Migrations
+## Database Synchronization
 
-### Run migrations
-```bash
-npm run migrate
-```
+The database schema is automatically synchronized with your Sequelize models when the server starts. The system uses `sequelize.sync({ alter: true })` which:
 
-### Rollback last migration
-```bash
-npm run migrate:undo
-```
+- Creates tables if they don't exist
+- Adds new columns if they're missing
+- Modifies existing columns if their definitions changed
+- Preserves existing data (does not drop columns or tables)
 
-### Rollback all migrations
-```bash
-npm run migrate:undo:all
-```
+This approach is ideal for development. For production environments, consider using migrations for better control over schema changes.
 
 ## Health Check
 
@@ -235,9 +225,6 @@ The API uses a centralized error handling middleware. Errors are returned in the
 
 - `npm start` - Start the server
 - `npm run dev` - Start the server in development mode with nodemon
-- `npm run migrate` - Run database migrations
-- `npm run migrate:undo` - Rollback last migration
-- `npm run migrate:undo:all` - Rollback all migrations
 
 ## License
 
