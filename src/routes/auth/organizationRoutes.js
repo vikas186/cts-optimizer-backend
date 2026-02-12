@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const organizationController = require('../../controllers/auth/organizationController');
-const { authenticate, authorize } = require('../../middleware/auth/auth');
+const { authenticate } = require('../../middleware/auth/auth');
 
 /**
  * @swagger
  * /api/organizations:
  *   get:
  *     summary: Get all organizations
+ *     description: Retrieve a list of all organizations
  *     tags: [Organizations]
  *     security:
  *       - bearerAuth: []
@@ -17,22 +18,18 @@ const { authenticate, authorize } = require('../../middleware/auth/auth');
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 count:
- *                   type: integer
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Organization'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessListResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Organization'
  *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/', authenticate, organizationController.getAll);
 
@@ -41,6 +38,7 @@ router.get('/', authenticate, organizationController.getAll);
  * /api/organizations/{id}:
  *   get:
  *     summary: Get organization by ID
+ *     description: Retrieve a specific organization by its ID
  *     tags: [Organizations]
  *     security:
  *       - bearerAuth: []
@@ -58,164 +56,21 @@ router.get('/', authenticate, organizationController.getAll);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/Organization'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Organization'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: Organization not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/:id', authenticate, organizationController.getById);
 
-/**
- * @swagger
- * /api/organizations:
- *   post:
- *     summary: Create a new organization
- *     tags: [Organizations]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
- *     responses:
- *       201:
- *         description: Organization created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/Organization'
- *       400:
- *         description: Bad request
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       403:
- *         description: Forbidden - Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-router.post('/', authenticate, authorize('admin'), organizationController.create);
-
-/**
- * @swagger
- * /api/organizations/{id}:
- *   put:
- *     summary: Update organization
- *     tags: [Organizations]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Organization UUID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *     responses:
- *       200:
- *         description: Organization updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/Organization'
- *       403:
- *         description: Forbidden - Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: Organization not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-router.put('/:id', authenticate, authorize('admin'), organizationController.update);
-
-/**
- * @swagger
- * /api/organizations/{id}:
- *   delete:
- *     summary: Delete organization
- *     tags: [Organizations]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Organization UUID
- *     responses:
- *       200:
- *         description: Organization deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     message:
- *                       type: string
- *       403:
- *         description: Forbidden - Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: Organization not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-router.delete('/:id', authenticate, authorize('admin'), organizationController.remove);
+// Upload flow only: no manual create/update/delete (GET only)
 
 module.exports = router;
-

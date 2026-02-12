@@ -1,9 +1,9 @@
 const bcrypt = require('bcryptjs');
-const { User } = require('../../models');
+const { User, Organization } = require('../../models');
 const { generateToken } = require('../../utils/jwt');
 
 const register = async (userData) => {
-  const { email, password, organization_id, role } = userData;
+  const { email, password } = userData;
 
   // Check if user already exists
   const existingUser = await User.findOne({ where: { email } });
@@ -11,16 +11,21 @@ const register = async (userData) => {
     throw new Error('User already exists with this email');
   }
 
+  // Create a new organization for this user (one org per signup)
+  const org = await Organization.create({
+    name: `Organization for ${email}`
+  });
+
   // Hash password
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  // Create user
+  // Create user linked to the new org
   const user = await User.create({
     email,
     password: hashedPassword,
-    organization_id,
-    role: role || 'user'
+    organization_id: org.id,
+    role: 'user'
   });
 
   // Remove password from response

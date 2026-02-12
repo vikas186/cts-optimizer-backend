@@ -30,7 +30,8 @@ const User = sequelize.define('User', {
   role: {
     type: DataTypes.STRING,
     allowNull: false,
-    defaultValue: 'user'
+    defaultValue: 'user',
+    validate: { isIn: [['user']] }
   },
   created_at: {
     type: DataTypes.DATE,

@@ -8,6 +8,7 @@ const { authenticate } = require('../../middleware/auth/auth');
  * /api/drop-size-results:
  *   get:
  *     summary: Get all drop size results
+ *     description: Retrieve a list of all drop size optimization results
  *     tags: [Drop Size Results]
  *     security:
  *       - bearerAuth: []
@@ -17,18 +18,18 @@ const { authenticate } = require('../../middleware/auth/auth');
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 count:
- *                   type: integer
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/DropSizeResult'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessListResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/DropSizeResult'
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/', authenticate, dropSizeResultController.getAll);
 
@@ -37,6 +38,7 @@ router.get('/', authenticate, dropSizeResultController.getAll);
  * /api/drop-size-results/{id}:
  *   get:
  *     summary: Get drop size result by ID
+ *     description: Retrieve a specific drop size result by its ID
  *     tags: [Drop Size Results]
  *     security:
  *       - bearerAuth: []
@@ -47,129 +49,28 @@ router.get('/', authenticate, dropSizeResultController.getAll);
  *         schema:
  *           type: string
  *           format: uuid
+ *         description: Drop size result UUID
  *     responses:
  *       200:
  *         description: Drop size result details
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/DropSizeResult'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/DropSizeResult'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: Drop size result not found
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/:id', authenticate, dropSizeResultController.getById);
 
-/**
- * @swagger
- * /api/drop-size-results:
- *   post:
- *     summary: Create a new drop size result
- *     tags: [Drop Size Results]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - order_id
- *               - organization_id
- *             properties:
- *               order_id:
- *                 type: string
- *               organization_id:
- *                 type: string
- *                 format: uuid
- *               fixed_cost:
- *                 type: number
- *                 format: float
- *               unit_variable_cost:
- *                 type: number
- *                 format: float
- *               unit_revenue:
- *                 type: number
- *                 format: float
- *               min_profitable_quantity:
- *                 type: number
- *                 format: float
- *     responses:
- *       201:
- *         description: Drop size result created successfully
- *       400:
- *         description: Bad request
- */
-router.post('/', authenticate, dropSizeResultController.create);
-
-/**
- * @swagger
- * /api/drop-size-results/{id}:
- *   put:
- *     summary: Update drop size result
- *     tags: [Drop Size Results]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               fixed_cost:
- *                 type: number
- *                 format: float
- *               unit_variable_cost:
- *                 type: number
- *                 format: float
- *               unit_revenue:
- *                 type: number
- *                 format: float
- *               min_profitable_quantity:
- *                 type: number
- *                 format: float
- *     responses:
- *       200:
- *         description: Drop size result updated successfully
- *       404:
- *         description: Drop size result not found
- */
-router.put('/:id', authenticate, dropSizeResultController.update);
-
-/**
- * @swagger
- * /api/drop-size-results/{id}:
- *   delete:
- *     summary: Delete drop size result
- *     tags: [Drop Size Results]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Drop size result deleted successfully
- *       404:
- *         description: Drop size result not found
- */
-router.delete('/:id', authenticate, dropSizeResultController.remove);
+// Upload flow only: no manual create/update/delete; results are read-only (GET)
 
 module.exports = router;

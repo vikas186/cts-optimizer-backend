@@ -3,7 +3,7 @@ const app = require('./src/app');
 const sequelize = require('./src/config/database');
 const models = require('./src/models');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 // Test database connection and sync models
 sequelize.authenticate()

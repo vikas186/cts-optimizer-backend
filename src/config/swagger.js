@@ -1,4 +1,5 @@
 const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 
 const options = {
   definition: {
@@ -6,15 +7,43 @@ const options = {
     info: {
       title: 'CTS Optimizer Backend API',
       version: '1.0.0',
-      description: 'API documentation for CTS Optimizer Backend',
+      description: `API documentation for CTS Optimizer Backend.
+
+**Upload flow only (no manual fill)**  
+The only way to add CTS data is POST /api/upload/excel. Upload your CTS template workbook; customers and routes are created automatically from the file. All other data endpoints are read-only (GET only): Organizations, Users, Customers, Routes, Warehouse Costs, Transport Costs, Orders, Cost Results, Drop Size Results. There are no POST, PUT, or DELETE endpoints for any of these; use Auth (register/login) and Upload (excel) only for writes.
+
+**Authentication**  
+Only these endpoints are public (no auth): POST /api/auth/register, POST /api/auth/login, GET /health.  
+All other endpoints require a JWT: set Authorization header to Bearer <token> or use the Authorize button above.`,
       contact: {
-        name: 'API Support'
+        name: 'API Support',
+        email: 'support@cts-optimizer.com'
       }
     },
+    tags: [
+      { name: 'Auth', description: 'Authentication — register and login are public; /me requires Bearer token' },
+      { name: 'Health', description: 'Health check (public, no auth)' },
+      { name: 'Upload', description: 'Excel upload — only data import; requires Bearer token' },
+      { name: 'Organizations', description: 'Organizations (read-only)' },
+      { name: 'Users', description: 'Users (read-only)' },
+      { name: 'Customers', description: 'Customers (read-only; from Excel upload)' },
+      { name: 'Routes', description: 'Routes (read-only; from Excel upload)' },
+      { name: 'Warehouse Costs', description: 'Warehouse costs (read-only; from Excel)' },
+      { name: 'Transport Costs', description: 'Transport costs (read-only; from Excel)' },
+      { name: 'Orders', description: 'Orders (read-only; from Excel)' },
+      { name: 'Cost Results', description: 'Cost results (read-only)' },
+      { name: 'Drop Size Results', description: 'Drop size results (read-only)' },
+      { name: 'Calculate', description: 'Cost engine and drop-size optimizer (run calculations)' },
+      { name: 'Export', description: 'CSV export for reports' }
+    ],
     servers: [
       {
-        url: `http://localhost:${process.env.PORT || 3000}`,
-        description: 'Development server'
+        url: process.env.NODE_ENV === 'production'
+          ? 'https://your-production-url.com'
+          : `http://localhost:${process.env.PORT || 4000}`,
+        description: process.env.NODE_ENV === 'production'
+          ? 'Production server'
+          : 'Development server'
       }
     ],
     components: {
@@ -22,26 +51,48 @@ const options = {
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
-          bearerFormat: 'JWT'
+          bearerFormat: 'JWT',
+          description: 'JWT authentication token'
         }
       },
       schemas: {
-        Organization: {
+        Error: {
           type: 'object',
           properties: {
-            id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Organization UUID'
+            success: {
+              type: 'boolean'
             },
-            name: {
-              type: 'string',
-              description: 'Organization name'
+            message: {
+              type: 'string'
             },
-            created_at: {
-              type: 'string',
-              format: 'date-time',
-              description: 'Creation timestamp'
+            error: {
+              type: 'string'
+            }
+          }
+        },
+        Success: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean'
+            },
+            message: {
+              type: 'string'
+            },
+            data: {
+              type: 'object',
+              description: 'Response data'
+            }
+          }
+        },
+        HealthCheck: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean'
+            },
+            message: {
+              type: 'string'
             }
           }
         },
@@ -51,41 +102,58 @@ const options = {
             id: {
               type: 'string',
               format: 'uuid',
-              description: 'User UUID'
-            },
-            organization_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Organization UUID'
+              description: 'User ID',
+              example: 'string'
             },
             email: {
               type: 'string',
               format: 'email',
-              description: 'User email'
+              description: 'User email',
+              example: 'string'
             },
             role: {
               type: 'string',
-              enum: ['user', 'admin'],
-              description: 'User role'
+              enum: ['user'],
+              description: 'User role (only user is supported)'
+            },
+            organization_id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Organization ID',
+              example: 'string'
             },
             created_at: {
               type: 'string',
               format: 'date-time',
-              description: 'Creation timestamp'
+              description: 'Creation timestamp',
+              example: 'string'
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp',
+              example: 'string'
             }
           }
         },
         Customer: {
           type: 'object',
           properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Customer ID',
+              example: 'string'
+            },
             customer_id: {
               type: 'string',
-              description: 'Customer ID'
+              description: 'Customer identifier'
             },
             organization_id: {
               type: 'string',
               format: 'uuid',
-              description: 'Organization UUID'
+              description: 'Organization ID',
+              example: 'string'
             },
             segment: {
               type: 'string',
@@ -95,113 +163,39 @@ const options = {
               type: 'number',
               format: 'float',
               description: 'Revenue per unit'
-            }
-          }
-        },
-        WarehouseCost: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Warehouse cost UUID'
             },
-            organization_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Organization UUID'
-            },
-            pick_cost_per_line: {
-              type: 'number',
-              format: 'float',
-              description: 'Pick cost per line'
-            },
-            pack_cost: {
-              type: 'number',
-              format: 'float',
-              description: 'Pack cost'
-            },
-            pallet_handling_cost: {
-              type: 'number',
-              format: 'float',
-              description: 'Pallet handling cost'
-            },
-            storage_cost_per_day: {
-              type: 'number',
-              format: 'float',
-              description: 'Storage cost per day'
-            },
-            effective_from: {
+            created_at: {
               type: 'string',
               format: 'date-time',
-              description: 'Effective from date'
-            }
-          }
-        },
-        Route: {
-          type: 'object',
-          properties: {
-            route_id: {
+              description: 'Creation timestamp',
+              example: 'string'
+            },
+            updated_at: {
               type: 'string',
-              description: 'Route ID'
-            },
-            organization_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Organization UUID'
-            },
-            distance_km: {
-              type: 'number',
-              format: 'float',
-              description: 'Distance in kilometers'
-            }
-          }
-        },
-        TransportCost: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Transport cost UUID'
-            },
-            route_id: {
-              type: 'string',
-              description: 'Route ID'
-            },
-            organization_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Organization UUID'
-            },
-            base_cost: {
-              type: 'number',
-              format: 'float',
-              description: 'Base cost'
-            },
-            cost_per_kg: {
-              type: 'number',
-              format: 'float',
-              description: 'Cost per kilogram'
-            },
-            cost_per_km: {
-              type: 'number',
-              format: 'float',
-              description: 'Cost per kilometer'
+              format: 'date-time',
+              description: 'Last update timestamp',
+              example: 'string'
             }
           }
         },
         Order: {
           type: 'object',
           properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Order ID',
+              example: 'string'
+            },
             order_id: {
               type: 'string',
-              description: 'Order ID'
+              description: 'Order identifier'
             },
             organization_id: {
               type: 'string',
               format: 'uuid',
-              description: 'Organization UUID'
+              description: 'Organization ID',
+              example: 'string'
             },
             customer_id: {
               type: 'string',
@@ -245,142 +239,303 @@ const options = {
             order_date: {
               type: 'string',
               format: 'date',
-              description: 'Order date'
+              description: 'Order date',
+              example: 'string'
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp',
+              example: 'string'
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp',
+              example: 'string'
+            }
+          }
+        },
+        LoginResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean'
+            },
+            message: {
+              type: 'string'
+            },
+            token: {
+              type: 'string',
+              description: 'JWT authentication token'
+            },
+            user: {
+              $ref: '#/components/schemas/User'
+            }
+          }
+        },
+        SuccessResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean'
+            },
+            message: {
+              type: 'string'
+            },
+            data: {
+              type: 'object',
+              description: 'Response data'
+            }
+          }
+        },
+        SuccessListResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean'
+            },
+            message: {
+              type: 'string'
+            },
+            data: {
+              type: 'array',
+              items: {
+                type: 'object'
+              },
+              description: 'Array of data items'
+            }
+          }
+        },
+        Organization: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Organization ID',
+              example: 'string'
+            },
+            name: {
+              type: 'string',
+              description: 'Organization name',
+              example: 'string'
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp',
+              example: 'string'
+            }
+          }
+        },
+        Route: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Route ID',
+              example: 'string'
+            },
+            route_id: {
+              type: 'string',
+              description: 'Route identifier',
+              example: 'string'
+            },
+            distance_km: {
+              type: 'number',
+              format: 'float',
+              description: 'Distance in kilometers',
+              example: 0
+            }
+          }
+        },
+        TransportCost: {
+          type: 'object',
+          properties: {
+            base_cost: {
+              type: 'number',
+              format: 'float',
+              description: 'Base cost',
+              example: 0
+            },
+            cost_per_kg: {
+              type: 'number',
+              format: 'float',
+              description: 'Cost per kilogram',
+              example: 0
+            },
+            cost_per_km: {
+              type: 'number',
+              format: 'float',
+              description: 'Cost per kilometer',
+              example: 0
+            }
+          }
+        },
+        WarehouseCost: {
+          type: 'object',
+          properties: {
+            pick_cost_per_line: {
+              type: 'number',
+              format: 'float',
+              description: 'Pick cost per line',
+              example: 0
+            },
+            pack_cost: {
+              type: 'number',
+              format: 'float',
+              description: 'Pack cost',
+              example: 0
+            },
+            pallet_handling_cost: {
+              type: 'number',
+              format: 'float',
+              description: 'Pallet handling cost',
+              example: 0
+            },
+            storage_cost_per_day: {
+              type: 'number',
+              format: 'float',
+              description: 'Storage cost per day',
+              example: 0
             }
           }
         },
         CostResult: {
           type: 'object',
           properties: {
-            id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Cost result UUID'
-            },
-            order_id: {
-              type: 'string',
-              description: 'Order ID'
-            },
-            organization_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Organization UUID'
-            },
             transport_cost: {
               type: 'number',
               format: 'float',
-              description: 'Transport cost'
+              description: 'Transport cost',
+              example: 0
             },
             warehouse_cost: {
               type: 'number',
               format: 'float',
-              description: 'Warehouse cost'
+              description: 'Warehouse cost',
+              example: 0
             },
             admin_cost: {
               type: 'number',
               format: 'float',
-              description: 'Admin cost'
+              description: 'Admin cost',
+              example: 0
             },
             return_cost: {
               type: 'number',
               format: 'float',
-              description: 'Return cost'
+              description: 'Return cost',
+              example: 0
             },
             cost_to_serve: {
               type: 'number',
               format: 'float',
-              description: 'Cost to serve'
+              description: 'Cost to serve',
+              example: 0
             },
             profit: {
               type: 'number',
               format: 'float',
-              description: 'Profit'
+              description: 'Profit',
+              example: 0
             },
             profitable: {
               type: 'boolean',
               description: 'Is profitable'
-            },
-            calculated_at: {
-              type: 'string',
-              format: 'date-time',
-              description: 'Calculation timestamp'
             }
           }
         },
         DropSizeResult: {
           type: 'object',
           properties: {
-            id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Drop size result UUID'
-            },
-            order_id: {
-              type: 'string',
-              description: 'Order ID'
-            },
-            organization_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Organization UUID'
-            },
             fixed_cost: {
               type: 'number',
               format: 'float',
-              description: 'Fixed cost'
+              description: 'Fixed cost',
+              example: 0
             },
             unit_variable_cost: {
               type: 'number',
               format: 'float',
-              description: 'Unit variable cost'
+              description: 'Unit variable cost',
+              example: 0
             },
             unit_revenue: {
               type: 'number',
               format: 'float',
-              description: 'Unit revenue'
+              description: 'Unit revenue',
+              example: 0
             },
             min_profitable_quantity: {
               type: 'number',
               format: 'float',
-              description: 'Minimum profitable quantity'
-            },
-            calculated_at: {
-              type: 'string',
-              format: 'date-time',
-              description: 'Calculation timestamp'
+              description: 'Minimum profitable quantity',
+              example: 0
+            }
+          }
+        }
+      },
+      responses: {
+        BadRequestError: {
+          description: 'Bad request - Invalid input data',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/components/schemas/Error'
+              }
             }
           }
         },
-        Error: {
-          type: 'object',
-          properties: {
-            success: {
-              type: 'boolean'
-            },
-            error: {
-              type: 'string',
-              description: 'Error message'
+        UnauthorizedError: {
+          description: 'Unauthorized - Authentication required',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/components/schemas/Error'
+              }
             }
           }
         },
-        Success: {
-          type: 'object',
-          properties: {
-            success: {
-              type: 'boolean'
-            },
-            data: {
-              type: 'object'
+        NotFoundError: {
+          description: 'Not found - Resource does not exist',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/components/schemas/Error'
+              }
+            }
+          }
+        },
+        InternalServerError: {
+          description: 'Internal server error',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/components/schemas/Error'
+              }
             }
           }
         }
       }
-    }
+    },
+    security: [
+      {
+        bearerAuth: []
+      }
+    ]
   },
-  apis: ['./src/routes/*.js', './src/app.js']
+  apis: [
+    './src/routes/**/*.js',
+    './src/app.js'
+  ]
 };
 
-const swaggerSpec = swaggerJsdoc(options);
+const specs = swaggerJsdoc(options);
 
-module.exports = swaggerSpec;
-
+module.exports = {
+  swaggerUi,
+  specs
+};

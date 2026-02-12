@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../../controllers/auth/userController');
-const { authenticate, authorize } = require('../../middleware/auth/auth');
+const { authenticate } = require('../../middleware/auth/auth');
 
 /**
  * @swagger
  * /api/users:
  *   get:
  *     summary: Get all users
+ *     description: Retrieve a list of all users
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -17,28 +18,27 @@ const { authenticate, authorize } = require('../../middleware/auth/auth');
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 count:
- *                   type: integer
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/User'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessListResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/User'
  *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Admin access required
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
-router.get('/', authenticate, authorize('admin'), userController.getAll);
+router.get('/', authenticate, userController.getAll);
 
 /**
  * @swagger
  * /api/users/{id}:
  *   get:
  *     summary: Get user by ID
+ *     description: Retrieve a specific user by its ID
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -49,126 +49,28 @@ router.get('/', authenticate, authorize('admin'), userController.getAll);
  *         schema:
  *           type: string
  *           format: uuid
+ *         description: User UUID
  *     responses:
  *       200:
  *         description: User details
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/User'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/User'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: User not found
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/:id', authenticate, userController.getById);
 
-/**
- * @swagger
- * /api/users:
- *   post:
- *     summary: Create a new user
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *               - organization_id
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 format: password
- *               organization_id:
- *                 type: string
- *                 format: uuid
- *               role:
- *                 type: string
- *                 enum: [user, admin]
- *     responses:
- *       201:
- *         description: User created successfully
- *       400:
- *         description: Bad request
- *       403:
- *         description: Forbidden - Admin access required
- */
-router.post('/', authenticate, authorize('admin'), userController.create);
-
-/**
- * @swagger
- * /api/users/{id}:
- *   put:
- *     summary: Update user
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 format: password
- *               role:
- *                 type: string
- *                 enum: [user, admin]
- *     responses:
- *       200:
- *         description: User updated successfully
- *       404:
- *         description: User not found
- */
-router.put('/:id', authenticate, userController.update);
-
-/**
- * @swagger
- * /api/users/{id}:
- *   delete:
- *     summary: Delete user
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: User deleted successfully
- *       403:
- *         description: Forbidden - Admin access required
- *       404:
- *         description: User not found
- */
-router.delete('/:id', authenticate, authorize('admin'), userController.remove);
+// Upload flow only: no manual create/update/delete; use POST /api/auth/register to create users (GET only here)
 
 module.exports = router;

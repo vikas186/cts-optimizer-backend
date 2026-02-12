@@ -2,10 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./config/swagger');
 const errorHandler = require('./middleware/common/errorHandler');
 const routes = require('./routes');
+const { swaggerUi, specs } = require('./config/swagger');
 
 const app = express();
 
@@ -27,66 +26,57 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Swagger Documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
   customCss: `
     .swagger-ui .topbar { display: none }
-    .swagger-ui .example-value { display: none !important }
-    .swagger-ui .model-example { display: none !important }
-    .swagger-ui .response-example { display: none !important }
-    .swagger-ui .highlight-code { display: none !important }
-    .swagger-ui .microlight { display: none !important }
-    .swagger-ui .renderedMarkdown pre { display: none !important }
-    .swagger-ui .opblock-body pre { display: none !important }
-    .swagger-ui .opblock-body .highlight-code { display: none !important }
-    .swagger-ui .response-col_description { display: none }
-    .swagger-ui .response-col_links { display: none }
-    .swagger-ui .response-content-type { display: none }
-    .swagger-ui .response .example { display: none !important }
-    .swagger-ui .response .examples { display: none !important }
-    .swagger-ui .response .example-wrapper { display: none !important }
-    .swagger-ui .response .example-value-wrapper { display: none !important }
+    /* Hide example values in Responses section only; keep request body examples visible */
+    .swagger-ui .responses-wrapper .example-value,
+    .swagger-ui .responses-wrapper .model-example,
+    .swagger-ui .response .example-value,
+    .swagger-ui .response .model-example,
+    .swagger-ui .responses-inner .example-value { display: none !important }
+    /* Hide media type / content-type in Responses section */
+    .swagger-ui .response-content-type,
+    .swagger-ui .response .response-content-type,
+    .swagger-ui .responses-wrapper .response-content-type,
+    .swagger-ui .responses-inner .response-content-type,
+    .swagger-ui .response-col_description .content-type { display: none !important }
   `,
-  customSiteTitle: 'CTS Optimizer API Documentation',
-  swaggerOptions: {
-    defaultModelsExpandDepth: -1,
-    defaultModelExpandDepth: -1,
-    displayRequestDuration: true,
-    docExpansion: 'list',
-    filter: true,
-    showExtensions: false,
-    showCommonExtensions: false,
-    tryItOutEnabled: true,
-    requestSnippetsEnabled: false
-  }
+  customSiteTitle: 'CTS Optimizer API Documentation'
 }));
 
 // Routes
 app.use('/api', routes);
 
-// Health check
 /**
  * @swagger
  * /health:
  *   get:
  *     summary: Health check endpoint
+ *     description: Returns the health status of the server (public - no auth required)
  *     tags: [Health]
+ *     security: []
  *     responses:
  *       200:
- *         description: Server is running
+ *         description: Server is running successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
+ *               $ref: '#/components/schemas/HealthCheck'
  */
+// Health check (public - no auth required)
 app.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Server is running'
+  });
+});
+
+// 404 handler - no route matched
+app.use((req, res, next) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found'
   });
 });
 

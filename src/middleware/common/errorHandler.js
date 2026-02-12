@@ -1,6 +1,7 @@
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
+  if (err.statusCode) error.statusCode = err.statusCode;
 
   // Log error
   console.error(err);
@@ -17,9 +18,11 @@ const errorHandler = (err, req, res, next) => {
     error = { message, statusCode: 400 };
   }
 
-  // Sequelize foreign key constraint error
+  // Sequelize foreign key constraint error (e.g. invalid organization_id on register)
   if (err.name === 'SequelizeForeignKeyConstraintError') {
-    const message = 'Resource not found';
+    const message = err.message && err.message.includes('organizations')
+      ? 'Organization not found. Please use a valid organization ID.'
+      : 'Referenced resource not found. Check that the referenced ID exists.';
     error = { message, statusCode: 404 };
   }
 

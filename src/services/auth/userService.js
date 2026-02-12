@@ -23,7 +23,7 @@ const create = async (data) => {
     const salt = await bcrypt.genSalt(10);
     data.password = await bcrypt.hash(data.password, salt);
   }
-  const user = await User.create(data);
+  const user = await User.create({ ...data, role: 'user' });
   const userResponse = user.toJSON();
   delete userResponse.password;
   return userResponse;
@@ -34,8 +34,9 @@ const update = async (id, data) => {
     const salt = await bcrypt.genSalt(10);
     data.password = await bcrypt.hash(data.password, salt);
   }
+  const { role, ...rest } = data;
   const user = await getById(id);
-  await User.update(data, { where: { id } });
+  await User.update(rest, { where: { id } });
   return await getById(id);
 };
 

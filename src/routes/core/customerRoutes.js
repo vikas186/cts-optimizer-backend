@@ -8,6 +8,7 @@ const { authenticate } = require('../../middleware/auth/auth');
  * /api/customers:
  *   get:
  *     summary: Get all customers
+ *     description: Retrieve a list of all customers
  *     tags: [Customers]
  *     security:
  *       - bearerAuth: []
@@ -17,18 +18,18 @@ const { authenticate } = require('../../middleware/auth/auth');
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 count:
- *                   type: integer
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Customer'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessListResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Customer'
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/', authenticate, customerController.getAll);
 
@@ -37,6 +38,7 @@ router.get('/', authenticate, customerController.getAll);
  * /api/customers/{id}:
  *   get:
  *     summary: Get customer by ID
+ *     description: Retrieve a specific customer by its ID
  *     tags: [Customers]
  *     security:
  *       - bearerAuth: []
@@ -53,107 +55,21 @@ router.get('/', authenticate, customerController.getAll);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/Customer'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Customer'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: Customer not found
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/:id', authenticate, customerController.getById);
 
-/**
- * @swagger
- * /api/customers:
- *   post:
- *     summary: Create a new customer
- *     tags: [Customers]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - customer_id
- *               - organization_id
- *             properties:
- *               customer_id:
- *                 type: string
- *               organization_id:
- *                 type: string
- *                 format: uuid
- *               segment:
- *                 type: string
- *               revenue_per_unit:
- *                 type: number
- *                 format: float
- *     responses:
- *       201:
- *         description: Customer created successfully
- *       400:
- *         description: Bad request
- */
-router.post('/', authenticate, customerController.create);
-
-/**
- * @swagger
- * /api/customers/{id}:
- *   put:
- *     summary: Update customer
- *     tags: [Customers]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               segment:
- *                 type: string
- *               revenue_per_unit:
- *                 type: number
- *                 format: float
- *     responses:
- *       200:
- *         description: Customer updated successfully
- *       404:
- *         description: Customer not found
- */
-router.put('/:id', authenticate, customerController.update);
-
-/**
- * @swagger
- * /api/customers/{id}:
- *   delete:
- *     summary: Delete customer
- *     tags: [Customers]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Customer deleted successfully
- *       404:
- *         description: Customer not found
- */
-router.delete('/:id', authenticate, customerController.remove);
+// XL-only flow: customers created from Excel upload (orders sheet); no manual create/update/delete
 
 module.exports = router;

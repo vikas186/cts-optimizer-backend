@@ -55,7 +55,7 @@ cp .env.example .env
 
 4. Update the `.env` file with your database credentials:
 ```env
-PORT=3000
+PORT=4000
 NODE_ENV=development
 
 DB_HOST=localhost
@@ -85,21 +85,21 @@ npm run dev
 npm start
 ```
 
-The server will start on `http://localhost:3000` (or the port specified in your `.env` file).
+The server will start on `http://localhost:4000` (or the port specified in your `.env` file).
 
 **Note:** The database schema will be automatically synchronized with your models using `ALTER TABLE` statements when the server starts. This ensures your database structure matches your Sequelize models without requiring manual migrations.
 
 ## API Documentation
 
 Swagger API documentation is available at:
-- **Swagger UI**: `http://localhost:3000/api-docs`
+- **Swagger UI**: `http://localhost:4000/api-docs`
 
 The Swagger documentation provides:
 - Interactive API testing interface
 - Complete endpoint descriptions
 - Request/response schemas
 - Authentication requirements
-- Example requests and responses
+- Example payloads for testing
 
 ## API Endpoints
 

@@ -8,6 +8,7 @@ const { authenticate } = require('../../middleware/auth/auth');
  * /api/routes:
  *   get:
  *     summary: Get all routes
+ *     description: Retrieve a list of all delivery routes
  *     tags: [Routes]
  *     security:
  *       - bearerAuth: []
@@ -17,18 +18,18 @@ const { authenticate } = require('../../middleware/auth/auth');
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 count:
- *                   type: integer
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Route'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessListResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Route'
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/', authenticate, routeController.getAll);
 
@@ -37,6 +38,7 @@ router.get('/', authenticate, routeController.getAll);
  * /api/routes/{id}:
  *   get:
  *     summary: Get route by ID
+ *     description: Retrieve a specific route by its ID
  *     tags: [Routes]
  *     security:
  *       - bearerAuth: []
@@ -53,103 +55,21 @@ router.get('/', authenticate, routeController.getAll);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/Route'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Route'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: Route not found
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/:id', authenticate, routeController.getById);
 
-/**
- * @swagger
- * /api/routes:
- *   post:
- *     summary: Create a new route
- *     tags: [Routes]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - route_id
- *               - organization_id
- *             properties:
- *               route_id:
- *                 type: string
- *               organization_id:
- *                 type: string
- *                 format: uuid
- *               distance_km:
- *                 type: number
- *                 format: float
- *     responses:
- *       201:
- *         description: Route created successfully
- *       400:
- *         description: Bad request
- */
-router.post('/', authenticate, routeController.create);
-
-/**
- * @swagger
- * /api/routes/{id}:
- *   put:
- *     summary: Update route
- *     tags: [Routes]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               distance_km:
- *                 type: number
- *                 format: float
- *     responses:
- *       200:
- *         description: Route updated successfully
- *       404:
- *         description: Route not found
- */
-router.put('/:id', authenticate, routeController.update);
-
-/**
- * @swagger
- * /api/routes/{id}:
- *   delete:
- *     summary: Delete route
- *     tags: [Routes]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Route deleted successfully
- *       404:
- *         description: Route not found
- */
-router.delete('/:id', authenticate, routeController.remove);
+// XL-only flow: routes created from Excel upload (orders + transport_costs); no manual create/update/delete
 
 module.exports = router;

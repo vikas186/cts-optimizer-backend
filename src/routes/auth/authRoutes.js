@@ -3,14 +3,20 @@ const router = express.Router();
 const authController = require('../../controllers/auth/authController');
 const { authenticate } = require('../../middleware/auth/auth');
 
+// Public routes (no auth): POST /register, POST /login
+// Protected routes (auth required): GET /me
+
 /**
  * @swagger
  * /api/auth/register:
  *   post:
  *     summary: Register a new user
- *     tags: [Authentication]
+ *     description: Create a new user account (public — no auth required)
+ *     tags: [Auth]
+ *     security: []
  *     requestBody:
  *       required: true
+ *       description: User registration — email and password only. A new organization is created automatically for the user.
  *       content:
  *         application/json:
  *           schema:
@@ -18,34 +24,27 @@ const { authenticate } = require('../../middleware/auth/auth');
  *             required:
  *               - email
  *               - password
- *               - organization_id
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
+ *                 description: User email address
  *               password:
  *                 type: string
  *                 format: password
- *               organization_id:
- *                 type: string
- *                 format: uuid
- *               role:
- *                 type: string
- *                 enum: [user, admin]
- *                 default: user
+ *                 description: User password
+
  *     responses:
  *       201:
  *         description: User registered successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Success'
+ *               $ref: '#/components/schemas/SuccessResponse'
  *       400:
- *         description: Bad request
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/BadRequestError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.post('/register', authController.register);
 
@@ -54,9 +53,12 @@ router.post('/register', authController.register);
  * /api/auth/login:
  *   post:
  *     summary: Login user
- *     tags: [Authentication]
+ *     description: Authenticate user and get JWT token (public — no auth required)
+ *     tags: [Auth]
+ *     security: []
  *     requestBody:
  *       required: true
+ *       description: User login credentials
  *       content:
  *         application/json:
  *           schema:
@@ -68,32 +70,25 @@ router.post('/register', authController.register);
  *               email:
  *                 type: string
  *                 format: email
+ *                 description: User email address
  *               password:
  *                 type: string
  *                 format: password
+ *                 description: User password
+
  *     responses:
  *       200:
  *         description: Login successful
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       $ref: '#/components/schemas/User'
- *                     token:
- *                       type: string
+ *               $ref: '#/components/schemas/LoginResponse'
  *       401:
- *         description: Invalid credentials
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.post('/login', authController.login);
 
@@ -102,7 +97,8 @@ router.post('/login', authController.login);
  * /api/auth/me:
  *   get:
  *     summary: Get current user
- *     tags: [Authentication]
+ *     description: Get the currently authenticated user's information (auth required)
+ *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -111,20 +107,17 @@ router.post('/login', authController.login);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/User'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/User'
  *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/me', authenticate, authController.getMe);
 
 module.exports = router;
-
