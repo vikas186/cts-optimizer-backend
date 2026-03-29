@@ -27,11 +27,23 @@ const TransportCost = sequelize.define('TransportCost', {
     type: DataTypes.FLOAT,
     allowNull: true
   },
+  min_charge: {
+    type: DataTypes.FLOAT,
+    allowNull: true
+  },
   cost_per_kg: {
     type: DataTypes.FLOAT,
     allowNull: true
   },
+  cost_per_pallet: {
+    type: DataTypes.FLOAT,
+    allowNull: true
+  },
   cost_per_km: {
+    type: DataTypes.FLOAT,
+    allowNull: true
+  },
+  fuel_surcharge_pct: {
     type: DataTypes.FLOAT,
     allowNull: true
   }

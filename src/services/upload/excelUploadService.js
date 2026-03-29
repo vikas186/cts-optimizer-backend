@@ -1,9 +1,10 @@
 const XLSX = require('xlsx');
-const { WarehouseCost, TransportCost, Order, Customer, Route, CostResult, DropSizeResult } = require('../../models');
+const { WarehouseCost, TransportCost, Shipment, Order, Customer, Route, CostResult, DropSizeResult } = require('../../models');
 
 const SHEET_NAMES = {
   WAREHOUSE_COSTS: 'warehouse_costs',
   TRANSPORT_COSTS: 'transport_costs',
+  SHIPMENTS: 'shipments',
   ORDERS: 'orders'
 };
 
@@ -52,9 +53,9 @@ function mapWarehouseCostRow(row, organizationId) {
     }
     return null;
   };
-  const pick = get('pick_cost', 'pick_cost_per_line');
-  const pack = get('pack_cost');
-  const pallet = get('pallet_han', 'pallet_handling_cost');
+  const pick = get('pick_cost_per_line', 'pick_cost');
+  const pack = get('pack_cost_per_order', 'pack_cost');
+  const pallet = get('pallet_handling_cost', 'pallet_han');
   const storage = get('storage_co', 'storage_cost_per_day', 'storage_cost');
   if (pick === null && pack === null && pallet === null && storage === null) return null;
   return {
@@ -83,9 +84,42 @@ function mapTransportCostRow(row, organizationId) {
   return {
     organization_id: organizationId,
     route_id,
-    base_cost: getNum('base_cost', 'min_charg'),
+    base_cost: getNum('base_cost'),
+    min_charge: getNum('min_charge', 'min_charg'),
     cost_per_kg: getNum('cost_per_kg', 'cost_per_l'),
-    cost_per_km: getNum('cost_per_km')
+    cost_per_pallet: getNum('cost_per_pallet'),
+    cost_per_km: getNum('cost_per_km'),
+    fuel_surcharge_pct: getNum('fuel_surcharge_pct', 'fuel_surcharge')
+  };
+}
+
+/**
+ * Map Excel columns to Shipment fields (total_weight_kg and total_pallets from shipments sheet).
+ */
+function mapShipmentRow(row, organizationId) {
+  const shipment_id = row.shipment_id != null ? String(row.shipment_id).trim() : (row.shipment != null ? String(row.shipment).trim() : null);
+  const route_id = row.route_id != null ? String(row.route_id).trim() : null;
+  if (!shipment_id || !route_id) return null;
+  const getNum = (...names) => {
+    for (const n of names) {
+      const v = row[n];
+      if (v !== undefined && v !== '' && v !== null) return Number(v);
+    }
+    return null;
+  };
+  const getInt = (...names) => {
+    const n = getNum(...names);
+    if (n === null) return null;
+    const i = Math.floor(n);
+    return Number.isNaN(i) ? null : i;
+  };
+  return {
+    shipment_id,
+    organization_id: organizationId,
+    route_id,
+    total_weight_kg: getNum('total_weight_kg', 'total_weight', 'weight_kg'),
+    total_pallets: getInt('total_pallets', 'pallets'),
+    shipment_date: toDateOnly(row.shipment_date || row.ship_date || row.order_date)
   };
 }
 
@@ -115,6 +149,7 @@ function mapOrderRow(row, organizationId) {
   const order_id = row.order_id != null ? String(row.order_id).trim() : null;
   const customer_id = (row.customer_id != null ? String(row.customer_id).trim() : null) || (row.customer != null ? String(row.customer).trim() : null);
   const route_id = row.route_id != null ? String(row.route_id).trim() : null;
+  const shipment_id = row.shipment_id != null ? String(row.shipment_id).trim() : (row.shipment != null ? String(row.shipment).trim() : null);
   if (!order_id || !customer_id || !route_id) return null;
   const getNum = (...names) => {
     for (const n of names) {
@@ -138,13 +173,16 @@ function mapOrderRow(row, organizationId) {
     organization_id: organizationId,
     customer_id,
     route_id,
+    shipment_id: shipment_id || null,
     sku: row.sku != null ? String(row.sku).trim() : null,
     quantity: getInt('quantity'),
+    unit_price: getNum('unit_price'),
     revenue: getNum('revenue'),
-    weight_kg: getNum('weight_kg'),
+    weight_kg: getNum('weight_kg', 'weight'),
     volume_m3: getNum('volume_m3', 'volume_m'),
-    lines: getInt('lines'),
-    pallets: getInt('pallets'),
+    lines: getInt('lines', 'line'),
+    pallets: getInt('pallets', 'pallet'),
+    storage_days: getInt('storage_days', 'storage', 'days'),
     order_date: orderDate
   };
 }
@@ -157,6 +195,7 @@ function parseWorkbook(buffer, organizationId) {
   const result = {
     warehouse_costs: [],
     transport_costs: [],
+    shipments: [],
     orders: []
   };
 
@@ -175,6 +214,15 @@ function parseWorkbook(buffer, organizationId) {
     for (const row of rows) {
       const mapped = mapTransportCostRow(row, organizationId);
       if (mapped) result.transport_costs.push(mapped);
+    }
+  }
+
+  const shipSheet = workbook.Sheets[workbook.SheetNames.find(n => normalizeHeader(n) === SHEET_NAMES.SHIPMENTS)];
+  if (shipSheet) {
+    const rows = sheetToRows(shipSheet);
+    for (const row of rows) {
+      const mapped = mapShipmentRow(row, organizationId);
+      if (mapped) result.shipments.push(mapped);
     }
   }
 
@@ -204,6 +252,9 @@ async function ensureCustomersAndRoutes(parsed, organizationId) {
   for (const t of parsed.transport_costs) {
     if (t.route_id) routeIds.add(t.route_id);
   }
+  for (const s of parsed.shipments || []) {
+    if (s.route_id) routeIds.add(s.route_id);
+  }
   for (const id of customerIds) {
     await Customer.findOrCreate({
       where: { customer_id: id, organization_id: organizationId },
@@ -223,6 +274,7 @@ async function ensureCustomersAndRoutes(parsed, organizationId) {
  */
 async function replaceExcelDataBeforeImport(organizationId) {
   await Order.destroy({ where: { organization_id: organizationId } });
+  await Shipment.destroy({ where: { organization_id: organizationId } });
   await TransportCost.destroy({ where: { organization_id: organizationId } });
   await WarehouseCost.destroy({ where: { organization_id: organizationId } });
 }
@@ -231,7 +283,7 @@ async function replaceExcelDataBeforeImport(organizationId) {
  * Import parsed data into DB. Replaces existing costs/orders, ensures customers/routes exist, then bulkCreate. Returns counts and errors.
  */
 async function importParsedData(parsed, organizationId) {
-  const imported = { warehouse_costs: 0, transport_costs: 0, orders: 0 };
+  const imported = { warehouse_costs: 0, transport_costs: 0, shipments: 0, orders: 0 };
   const errors = [];
 
   try {
@@ -266,6 +318,15 @@ async function importParsedData(parsed, organizationId) {
     }
   }
 
+  if (parsed.shipments && parsed.shipments.length > 0) {
+    try {
+      const created = await Shipment.bulkCreate(parsed.shipments);
+      imported.shipments = created.length;
+    } catch (err) {
+      errors.push({ sheet: 'shipments', message: err.message });
+    }
+  }
+
   if (parsed.orders.length > 0) {
     try {
       const created = await Order.bulkCreate(parsed.orders);
@@ -293,6 +354,7 @@ async function uploadExcel(buffer, organizationId) {
     parsed_counts: {
       warehouse_costs: parsed.warehouse_costs.length,
       transport_costs: parsed.transport_costs.length,
+      shipments: (parsed.shipments || []).length,
       orders: parsed.orders.length
     },
     errors: errors.length ? errors : undefined
@@ -304,7 +366,7 @@ async function uploadExcel(buffer, organizationId) {
  * Returns counts of deleted rows per entity.
  */
 async function deleteAllExcelData(organizationId) {
-  const deleted = { cost_results: 0, drop_size_results: 0, orders: 0, transport_costs: 0, warehouse_costs: 0, routes: 0, customers: 0 };
+  const deleted = { cost_results: 0, drop_size_results: 0, orders: 0, shipments: 0, transport_costs: 0, warehouse_costs: 0, routes: 0, customers: 0 };
 
   const cr = await CostResult.destroy({ where: { organization_id: organizationId } });
   deleted.cost_results = cr;
@@ -314,6 +376,9 @@ async function deleteAllExcelData(organizationId) {
 
   const ord = await Order.destroy({ where: { organization_id: organizationId } });
   deleted.orders = ord;
+
+  const ship = await Shipment.destroy({ where: { organization_id: organizationId } });
+  deleted.shipments = ship;
 
   const tc = await TransportCost.destroy({ where: { organization_id: organizationId } });
   deleted.transport_costs = tc;

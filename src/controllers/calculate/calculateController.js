@@ -8,6 +8,13 @@ const runCostToServe = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'User organization not set.' });
     }
     const result = await costEngineService.calculateCostToServe(organizationId);
+    if (result.error && result.missingFields?.length) {
+      return res.status(400).json({
+        success: false,
+        error: result.message,
+        missingFields: result.missingFields
+      });
+    }
     return res.status(200).json({
       success: true,
       message: `Cost-to-serve calculated for ${result.calculated} orders.`,
@@ -42,6 +49,13 @@ const runAll = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'User organization not set.' });
     }
     const costResult = await costEngineService.calculateCostToServe(organizationId);
+    if (costResult.error && costResult.missingFields?.length) {
+      return res.status(400).json({
+        success: false,
+        error: costResult.message,
+        missingFields: costResult.missingFields
+      });
+    }
     const dropResult = await dropSizeService.calculateDropSize(organizationId);
     return res.status(200).json({
       success: true,

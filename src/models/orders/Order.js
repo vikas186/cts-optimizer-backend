@@ -30,12 +30,24 @@ const Order = sequelize.define('Order', {
       key: 'route_id'
     }
   },
+  shipment_id: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    references: {
+      model: 'shipments',
+      key: 'shipment_id'
+    }
+  },
   sku: {
     type: DataTypes.STRING,
     allowNull: true
   },
   quantity: {
     type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  unit_price: {
+    type: DataTypes.FLOAT,
     allowNull: true
   },
   revenue: {
@@ -55,6 +67,10 @@ const Order = sequelize.define('Order', {
     allowNull: true
   },
   pallets: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  storage_days: {
     type: DataTypes.INTEGER,
     allowNull: true
   },

@@ -7,6 +7,7 @@ const Customer = require('./core/Customer');
 const Route = require('./core/Route');
 const WarehouseCost = require('./costs/WarehouseCost');
 const TransportCost = require('./costs/TransportCost');
+const Shipment = require('./shipments/Shipment');
 const Order = require('./orders/Order');
 const CostResult = require('./results/CostResult');
 const DropSizeResult = require('./results/DropSizeResult');
@@ -67,6 +68,16 @@ TransportCost.belongsTo(Organization, {
   as: 'organization'
 });
 
+// Organizations → Shipments (1:N)
+Organization.hasMany(Shipment, {
+  foreignKey: 'organization_id',
+  as: 'shipments'
+});
+Shipment.belongsTo(Organization, {
+  foreignKey: 'organization_id',
+  as: 'organization'
+});
+
 // Organizations → Orders (1:N)
 Organization.hasMany(Order, {
   foreignKey: 'organization_id',
@@ -111,6 +122,16 @@ TransportCost.belongsTo(Route, {
   as: 'route'
 });
 
+// Routes → Shipments (1:N)
+Route.hasMany(Shipment, {
+  foreignKey: 'route_id',
+  as: 'shipments'
+});
+Shipment.belongsTo(Route, {
+  foreignKey: 'route_id',
+  as: 'route'
+});
+
 // Routes → Orders (1:N) - "associated with"
 Route.hasMany(Order, {
   foreignKey: 'route_id',
@@ -119,6 +140,16 @@ Route.hasMany(Order, {
 Order.belongsTo(Route, {
   foreignKey: 'route_id',
   as: 'route'
+});
+
+// Shipments → Orders (1:N)
+Shipment.hasMany(Order, {
+  foreignKey: 'shipment_id',
+  as: 'orders'
+});
+Order.belongsTo(Shipment, {
+  foreignKey: 'shipment_id',
+  as: 'shipment'
 });
 
 // ============================================
@@ -167,6 +198,7 @@ module.exports = {
   WarehouseCost,
   Route,
   TransportCost,
+  Shipment,
   Order,
   CostResult,
   DropSizeResult

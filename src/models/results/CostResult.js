@@ -47,6 +47,10 @@ const CostResult = sequelize.define('CostResult', {
     type: DataTypes.FLOAT,
     allowNull: true
   },
+  profit_margin_pct: {
+    type: DataTypes.FLOAT,
+    allowNull: true
+  },
   profitable: {
     type: DataTypes.BOOLEAN,
     allowNull: true,
