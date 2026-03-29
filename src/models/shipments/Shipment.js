@@ -27,7 +27,7 @@ const Shipment = sequelize.define('Shipment', {
     allowNull: true
   },
   total_pallets: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: true
   },
   shipment_date: {

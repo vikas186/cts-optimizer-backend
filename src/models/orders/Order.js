@@ -67,7 +67,7 @@ const Order = sequelize.define('Order', {
     allowNull: true
   },
   pallets: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: true
   },
   storage_days: {

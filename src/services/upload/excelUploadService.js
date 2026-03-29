@@ -56,7 +56,7 @@ function mapWarehouseCostRow(row, organizationId) {
   const pick = get('pick_cost_per_line', 'pick_cost');
   const pack = get('pack_cost_per_order', 'pack_cost');
   const pallet = get('pallet_handling_cost', 'pallet_han');
-  const storage = get('storage_co', 'storage_cost_per_day', 'storage_cost');
+  const storage = get('storage_cost_per_pallet_day', 'storage_co', 'storage_cost_per_day', 'storage_cost');
   if (pick === null && pack === null && pallet === null && storage === null) return null;
   return {
     organization_id: organizationId,
@@ -118,7 +118,7 @@ function mapShipmentRow(row, organizationId) {
     organization_id: organizationId,
     route_id,
     total_weight_kg: getNum('total_weight_kg', 'total_weight', 'weight_kg'),
-    total_pallets: getInt('total_pallets', 'pallets'),
+    total_pallets: getNum('total_pallets', 'pallets'),
     shipment_date: toDateOnly(row.shipment_date || row.ship_date || row.order_date)
   };
 }
@@ -181,7 +181,7 @@ function mapOrderRow(row, organizationId) {
     weight_kg: getNum('weight_kg', 'weight'),
     volume_m3: getNum('volume_m3', 'volume_m'),
     lines: getInt('lines', 'line'),
-    pallets: getInt('pallets', 'pallet'),
+    pallets: getNum('pallets', 'pallet'),
     storage_days: getInt('storage_days', 'storage', 'days'),
     order_date: orderDate
   };

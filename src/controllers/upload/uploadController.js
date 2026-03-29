@@ -1,4 +1,6 @@
 const excelUploadService = require('../../services/upload/excelUploadService');
+const costEngineService = require('../../services/costEngine/costEngineService');
+const dropSizeService = require('../../services/optimizer/dropSizeService');
 
 const uploadExcel = async (req, res, next) => {
   try {
@@ -16,13 +18,26 @@ const uploadExcel = async (req, res, next) => {
       });
     }
     const result = await excelUploadService.uploadExcel(req.file.buffer, organizationId);
+    
+    let calcResults = {};
+    if (result.success) {
+      try {
+        const costRes = await costEngineService.calculateCostToServe(organizationId);
+        const dropRes = await dropSizeService.calculateDropSize(organizationId);
+        calcResults = { costToServe: costRes.calculated, dropSize: dropRes.calculated };
+      } catch(err) {
+        console.error('Auto-calculation failed:', err.message);
+      }
+    }
+
     const status = result.success ? 200 : 207;
     return res.status(status).json({
       success: result.success,
-      message: result.success ? 'Import successful' : 'Import completed with errors',
+      message: result.success ? 'Import and calculation successful' : 'Import completed with errors',
       data: {
         imported: result.imported,
-        parsed_counts: result.parsed_counts
+        parsed_counts: result.parsed_counts,
+        calculations: calcResults
       },
       ...(result.errors && result.errors.length ? { errors: result.errors } : {})
     });
