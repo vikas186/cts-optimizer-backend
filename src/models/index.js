@@ -1,19 +1,24 @@
 const sequelize = require('../config/database');
 
 // Import all models
-const Organization = require('./Organization');
-const User = require('./User');
-const Customer = require('./Customer');
-const WarehouseCost = require('./WarehouseCost');
-const Route = require('./Route');
-const TransportCost = require('./TransportCost');
-const Order = require('./Order');
-const CostResult = require('./CostResult');
-const DropSizeResult = require('./DropSizeResult');
+const Organization = require('./auth/Organization');
+const User = require('./auth/User');
+const Customer = require('./core/Customer');
+const Route = require('./core/Route');
+const WarehouseCost = require('./costs/WarehouseCost');
+const TransportCost = require('./costs/TransportCost');
+const Shipment = require('./shipments/Shipment');
+const Order = require('./orders/Order');
+const CostResult = require('./results/CostResult');
+const DropSizeResult = require('./results/DropSizeResult');
 
-// Define associations
+// Define associations according to ER Diagram
 
-// Organizations → Users (1:N)
+// ============================================
+// ORGANIZATIONS Associations (Central Entity)
+// ============================================
+
+// Organizations → Users (1:N) - "has"
 Organization.hasMany(User, {
   foreignKey: 'organization_id',
   as: 'users'
@@ -23,7 +28,7 @@ User.belongsTo(Organization, {
   as: 'organization'
 });
 
-// Organizations → Customers (1:N)
+// Organizations → Customers (1:N) - "owns"
 Organization.hasMany(Customer, {
   foreignKey: 'organization_id',
   as: 'customers'
@@ -33,7 +38,7 @@ Customer.belongsTo(Organization, {
   as: 'organization'
 });
 
-// Organizations → WarehouseCosts (1:N)
+// Organizations → WarehouseCosts (1:N) - "defines"
 Organization.hasMany(WarehouseCost, {
   foreignKey: 'organization_id',
   as: 'warehouseCosts'
@@ -43,7 +48,7 @@ WarehouseCost.belongsTo(Organization, {
   as: 'organization'
 });
 
-// Organizations → Routes (1:N)
+// Organizations → Routes (1:N) - "owns"
 Organization.hasMany(Route, {
   foreignKey: 'organization_id',
   as: 'routes'
@@ -51,16 +56,6 @@ Organization.hasMany(Route, {
 Route.belongsTo(Organization, {
   foreignKey: 'organization_id',
   as: 'organization'
-});
-
-// Routes → TransportCosts (1:N)
-Route.hasMany(TransportCost, {
-  foreignKey: 'route_id',
-  as: 'transportCosts'
-});
-TransportCost.belongsTo(Route, {
-  foreignKey: 'route_id',
-  as: 'route'
 });
 
 // Organizations → TransportCosts (1:N)
@@ -73,14 +68,14 @@ TransportCost.belongsTo(Organization, {
   as: 'organization'
 });
 
-// Customers → Orders (1:N)
-Customer.hasMany(Order, {
-  foreignKey: 'customer_id',
-  as: 'orders'
+// Organizations → Shipments (1:N)
+Organization.hasMany(Shipment, {
+  foreignKey: 'organization_id',
+  as: 'shipments'
 });
-Order.belongsTo(Customer, {
-  foreignKey: 'customer_id',
-  as: 'customer'
+Shipment.belongsTo(Organization, {
+  foreignKey: 'organization_id',
+  as: 'organization'
 });
 
 // Organizations → Orders (1:N)
@@ -93,26 +88,6 @@ Order.belongsTo(Organization, {
   as: 'organization'
 });
 
-// Routes → Orders (1:N)
-Route.hasMany(Order, {
-  foreignKey: 'route_id',
-  as: 'orders'
-});
-Order.belongsTo(Route, {
-  foreignKey: 'route_id',
-  as: 'route'
-});
-
-// Orders → CostResults (1:N)
-Order.hasMany(CostResult, {
-  foreignKey: 'order_id',
-  as: 'costResults'
-});
-CostResult.belongsTo(Order, {
-  foreignKey: 'order_id',
-  as: 'order'
-});
-
 // Organizations → CostResults (1:N)
 Organization.hasMany(CostResult, {
   foreignKey: 'organization_id',
@@ -121,16 +96,6 @@ Organization.hasMany(CostResult, {
 CostResult.belongsTo(Organization, {
   foreignKey: 'organization_id',
   as: 'organization'
-});
-
-// Orders → DropSizeResults (1:N)
-Order.hasMany(DropSizeResult, {
-  foreignKey: 'order_id',
-  as: 'dropSizeResults'
-});
-DropSizeResult.belongsTo(Order, {
-  foreignKey: 'order_id',
-  as: 'order'
 });
 
 // Organizations → DropSizeResults (1:N)
@@ -143,6 +108,88 @@ DropSizeResult.belongsTo(Organization, {
   as: 'organization'
 });
 
+// ============================================
+// ROUTES Associations
+// ============================================
+
+// Routes → TransportCosts (1:N) - "has"
+Route.hasMany(TransportCost, {
+  foreignKey: 'route_id',
+  as: 'transportCosts'
+});
+TransportCost.belongsTo(Route, {
+  foreignKey: 'route_id',
+  as: 'route'
+});
+
+// Routes → Shipments (1:N)
+Route.hasMany(Shipment, {
+  foreignKey: 'route_id',
+  as: 'shipments'
+});
+Shipment.belongsTo(Route, {
+  foreignKey: 'route_id',
+  as: 'route'
+});
+
+// Routes → Orders (1:N) - "associated with"
+Route.hasMany(Order, {
+  foreignKey: 'route_id',
+  as: 'orders'
+});
+Order.belongsTo(Route, {
+  foreignKey: 'route_id',
+  as: 'route'
+});
+
+// Shipments → Orders (1:N)
+Shipment.hasMany(Order, {
+  foreignKey: 'shipment_id',
+  as: 'orders'
+});
+Order.belongsTo(Shipment, {
+  foreignKey: 'shipment_id',
+  as: 'shipment'
+});
+
+// ============================================
+// CUSTOMERS Associations
+// ============================================
+
+// Customers → Orders (1:N) - "places"
+Customer.hasMany(Order, {
+  foreignKey: 'customer_id',
+  as: 'orders'
+});
+Order.belongsTo(Customer, {
+  foreignKey: 'customer_id',
+  as: 'customer'
+});
+
+// ============================================
+// ORDERS Associations
+// ============================================
+
+// Orders → CostResults (1:N) - "generates"
+Order.hasMany(CostResult, {
+  foreignKey: 'order_id',
+  as: 'costResults'
+});
+CostResult.belongsTo(Order, {
+  foreignKey: 'order_id',
+  as: 'order'
+});
+
+// Orders → DropSizeResults (1:N) - "optimized_for"
+Order.hasMany(DropSizeResult, {
+  foreignKey: 'order_id',
+  as: 'dropSizeResults'
+});
+DropSizeResult.belongsTo(Order, {
+  foreignKey: 'order_id',
+  as: 'order'
+});
+
 module.exports = {
   sequelize,
   Organization,
@@ -151,6 +198,7 @@ module.exports = {
   WarehouseCost,
   Route,
   TransportCost,
+  Shipment,
   Order,
   CostResult,
   DropSizeResult
