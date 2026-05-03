@@ -1,6 +1,15 @@
 const { Order, Shipment, WarehouseCost, TransportCost, CostResult } = require('../../models');
+const path = require('path');
 
-/**
+const { generateCustomerSummary } = require('../../aggregation/customer');
+const { generateSkuSummary } = require('../../aggregation/sku');
+const { generateRouteSummary } = require('../../aggregation/route');
+const { validateShipments } = require('../../aggregation/shipmentValidation');
+
+const { identifyUnprofitableCustomers } = require('../../insights/unprofitable');
+const { identifyLowDropSizeCustomers } = require('../../insights/dropSize');
+const { identifyHighCostSkus } = require('../../insights/skuAnalysis');
+const { generateMarginLeakage, generateTopOpportunities } = require('../../insights/opportunities');/**
  * Cost-to-Serve calculation matching client Excel template.
  *
  * Data sources:
@@ -266,6 +275,7 @@ async function calculateCostToServe(organizationId) {
   }
 
   const rows = [];
+  const ordersData = [];
   for (const order of orders) {
     const oid = order.get ? order.get('order_id') : order.order_id;
     
@@ -304,12 +314,53 @@ async function calculateCostToServe(organizationId) {
       profit_margin_pct,
       profitable
     });
+
+    const sid = order.get ? order.get('shipment_id') : order.shipment_id;
+    ordersData.push({
+      order_id: oid,
+      customer_id: order.get ? order.get('customer_id') : order.customer_id,
+      sku: order.get ? order.get('sku') : order.sku,
+      shipment_id: sid,
+      route_id: order.get ? order.get('route_id') : order.route_id,
+      quantity: Math.max(0, toFloat(order.get ? order.get('quantity') : order.quantity)),
+      revenue: revenue,
+      transport_cost: orderTransport,
+      warehouse_cost: warehouseCost,
+      cost_to_serve: costToServe,
+      profit: profit,
+      variable_cost_per_unit: toFloat(order.get ? order.get('variable_cost_per_unit') : order.variable_cost_per_unit),
+      fixed_cost: toFloat(order.get ? order.get('fixed_cost') : order.fixed_cost),
+      q_min: toFloat(order.get ? order.get('q_min') : order.q_min),
+      weight: toFloat(order.get ? order.get('weight_kg') : order.weight_kg),
+      shipment_transport_cost: (shipmentFinalTransport[sid] || {}).finalTransport || 0
+    });
   }
 
   await CostResult.destroy({ where: { organization_id: organizationId } });
   if (rows.length > 0) {
     await CostResult.bulkCreate(rows);
   }
+
+  // STEP 5: Run aggregations and insights
+  try {
+    const outputDir = path.join(process.cwd(), 'output');
+    
+    // Aggregations
+    const customerSummary = await generateCustomerSummary(ordersData, outputDir);
+    const skuSummary = await generateSkuSummary(ordersData, outputDir);
+    await generateRouteSummary(ordersData, outputDir);
+    await validateShipments(ordersData, outputDir);
+    
+    // Insights
+    await identifyUnprofitableCustomers(customerSummary, outputDir);
+    await identifyLowDropSizeCustomers(customerSummary, outputDir);
+    await identifyHighCostSkus(skuSummary, outputDir);
+    await generateMarginLeakage(ordersData, outputDir);
+    await generateTopOpportunities(ordersData, outputDir);
+  } catch (err) {
+    console.error("Error generating aggregations and insights CSVs:", err);
+  }
+
   return { calculated: rows.length };
 }
 
