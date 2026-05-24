@@ -1,51 +1,45 @@
-const fs = require('fs');
 const path = require('path');
+const { writeCsv } = require('../utils/csvWriter');
+const { roundMoney } = require('../utils/mathHelpers');
 
-async function identifyMarginLeakage(ordersData, outputDir) {
-  const lossOrders = ordersData.filter(o => o.profit < 0);
-  
-  const leakageMap = new Map();
+function generateMarginLeakage(results, outputDir) {
+  const lossOrders = results.filter((row) => (parseFloat(row.profit) || 0) < 0);
+  const leakageRecords = [];
 
-  for (const o of lossOrders) {
-    const loss = Math.abs(o.profit); // total loss is positive value
-    const dims = [
-      { type: 'customer_id', val: o.customer_id },
-      { type: 'sku', val: o.sku },
-      { type: 'route_id', val: o.route_id }
-    ];
+  const dimensions = [
+    { name: 'customer_id', field: 'customer_id' },
+    { name: 'sku', field: 'sku' },
+    { name: 'route_id', field: 'route_id' }
+  ];
 
-    for (const d of dims) {
-      if (d.val) {
-        const key = `${d.type}::${d.val}`;
-        if (!leakageMap.has(key)) {
-          leakageMap.set(key, { dimension_type: d.type, dimension: d.val, total_loss: 0, number_of_loss_orders: 0 });
-        }
-        const entry = leakageMap.get(key);
-        entry.total_loss += loss;
-        entry.number_of_loss_orders += 1;
+  for (const dim of dimensions) {
+    const dimMap = new Map();
+
+    for (const row of lossOrders) {
+      const val = row[dim.field];
+      if (val === undefined || val === null || val === '') continue;
+
+      if (!dimMap.has(val)) {
+        dimMap.set(val, { total_loss: 0, number_of_loss_orders: 0 });
       }
+      const entry = dimMap.get(val);
+      entry.total_loss += Math.abs(parseFloat(row.profit) || 0);
+      entry.number_of_loss_orders += 1;
+    }
+
+    for (const [val, entry] of dimMap.entries()) {
+      leakageRecords.push({
+        dimension: dim.name,
+        dimension_value: val,
+        total_loss: roundMoney(entry.total_loss).toFixed(2),
+        number_of_loss_orders: entry.number_of_loss_orders
+      });
     }
   }
 
-  const results = Array.from(leakageMap.values()).map(r => ({
-    ...r,
-    total_loss: Number(r.total_loss.toFixed(2))
-  }));
-
-  // Sort descending by total_loss
-  results.sort((a, b) => b.total_loss - a.total_loss);
-
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  const headers = ['dimension', 'total_loss', 'number_of_loss_orders'];
-  const lines = [headers.join(',')];
-  for (const r of results) {
-    lines.push(headers.map(h => r[h]).join(','));
-  }
-  fs.writeFileSync(path.join(outputDir, 'margin_leakage.csv'), lines.join('\n'));
-  return results;
+  leakageRecords.sort((a, b) => parseFloat(b.total_loss) - parseFloat(a.total_loss));
+  writeCsv(path.join(outputDir, 'margin_leakage.csv'), leakageRecords);
+  return leakageRecords;
 }
 
-module.exports = { identifyMarginLeakage };
+module.exports = { generateMarginLeakage };

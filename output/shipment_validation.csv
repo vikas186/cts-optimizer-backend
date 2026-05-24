@@ -1,0 +1,3 @@
+shipment_id,shipment_total_cts,allocated_cost,shipment_total_weight,shipment_total_quantity,expected_cost,variance,status
+S001,121.68,110.88,60.00,30.00,110.88,0.00,OK
+S002,212.00,200.10,160.00,80.00,200.10,0.00,OK

@@ -1,37 +1,26 @@
-const { Order, Shipment, WarehouseCost, TransportCost, CostResult } = require('../../models');
+const fs = require('fs');
+const { Order, Shipment, WarehouseCost, TransportCost, CostResult, DropSizeResult } = require('../../models');
 const path = require('path');
-
-const { generateCustomerSummary } = require('../../aggregation/customer');
-const { generateSkuSummary } = require('../../aggregation/sku');
-const { generateRouteSummary } = require('../../aggregation/route');
-const { validateShipments } = require('../../aggregation/shipmentValidation');
-
-const { identifyUnprofitableCustomers } = require('../../insights/unprofitable');
-const { identifyLowDropSizeCustomers } = require('../../insights/dropSize');
-const { identifyHighCostSkus } = require('../../insights/skuAnalysis');
-const { generateMarginLeakage, generateTopOpportunities } = require('../../insights/opportunities');/**
- * Cost-to-Serve calculation matching client Excel template.
+const { runAllAggregations } = require('../../aggregation');
+const { runAllInsights } = require('../../insights');
+const { writeCsv } = require('../../utils/csvWriter');
+/**
+ * Cost-to-Serve calculation matching client specification.
  *
- * Data sources:
- * - order.weight_kg, order.lines, order.pallets: from orders sheet
- * - shipment.total_weight_kg, shipment.total_pallets: from shipments sheet (no aggregation from orders)
+ * 1) TRANSPORT COST (Shipment Level) — totals aggregated from orders per shipment
+ *    transport_before_min = base_cost + (total_weight * cost_per_kg) + (total_pallets * cost_per_pallet)
+ *    transport_after_min = max(transport_before_min, min_charge)
+ *    fuel_cost = transport_after_min * fuel_percentage
+ *    final_shipment_transport_cost = transport_after_min + fuel_cost
  *
- * 1) TRANSPORT COST (Shipment Level) — from shipments sheet
- *    variable = (total_weight_kg * cost_per_kg) + (total_pallets * cost_per_pallet)
- *    beforeFuel = max(base_cost, variable, min_charge)
- *    fuel = beforeFuel * (fuel_surcharge_pct / 100)
- *    final = beforeFuel + fuel
- *
- * 2) TRANSPORT ALLOCATION (Order Level)
- *    order_transport = shipment_transport * (order.weight_kg / shipment.total_weight_kg)
- *    order.weight_kg from orders sheet; shipment.total_weight_kg from shipments sheet.
- *    If shipment.total_weight_kg is 0, allocate by pallet share; if both 0, use 0.
+ * 2) TRANSPORT ALLOCATION (Order Level) — weight-based; last order gets remainder
+ *    order_transport = (order_weight / shipment_total_weight) * final_shipment_transport_cost
  *
  * 3) WAREHOUSE COST (Order Level)
- *    warehouse = (lines * pick_cost_per_line) + pack_cost_per_order + (pallets * pallet_handling_cost)
+ *    warehouse = pick + pack + pallet_handling + storage
  *
  * 4) COST TO SERVE = order_transport + warehouse_cost
- * 5) REVENUE = order.quantity * order.unit_price (or order.revenue if unit_price not set)
+ * 5) REVENUE = quantity * unit_price (or order.revenue)
  * 6) PROFIT = revenue - cost_to_serve
  */
 
@@ -133,6 +122,48 @@ function getRevenue(order) {
   return toFloat(order.revenue);
 }
 
+function hasValue(v) {
+  return v != null && v !== '' && !Number.isNaN(Number(v));
+}
+
+function resolveAnalyticFields(order, dropByOrderId) {
+  const oid = order.get ? order.get('order_id') : order.order_id;
+  const drop = dropByOrderId.get(oid);
+
+  const orderQMin = order.get ? order.get('q_min') : order.q_min;
+  const orderVc = order.get ? order.get('variable_cost_per_unit') : order.variable_cost_per_unit;
+  const orderFixed = order.get ? order.get('fixed_cost') : order.fixed_cost;
+
+  return {
+    q_min: hasValue(orderQMin) ? toFloat(orderQMin) : (drop?.min_profitable_quantity != null ? toFloat(drop.min_profitable_quantity) : 0),
+    variable_cost_per_unit: hasValue(orderVc) ? toFloat(orderVc) : (drop?.unit_variable_cost != null ? toFloat(drop.unit_variable_cost) : 0),
+    fixed_cost: hasValue(orderFixed) ? toFloat(orderFixed) : (drop?.fixed_cost != null ? toFloat(drop.fixed_cost) : 0)
+  };
+}
+
+function writeOrderLevelResultsCsv(ordersData, outputDir) {
+  const columns = [
+    'order_id', 'customer_id', 'sku', 'shipment_id', 'route_id', 'quantity',
+    'revenue', 'transport_cost', 'warehouse_cost', 'cost_to_serve', 'profit',
+    'variable_cost_per_unit', 'fixed_cost', 'q_min'
+  ];
+  const rows = ordersData.map((row) => {
+    const out = {};
+    for (const col of columns) {
+      const val = row[col];
+      if (typeof val === 'number' && !Number.isInteger(val)) {
+        out[col] = Number(val.toFixed(2));
+      } else {
+        out[col] = val ?? '';
+      }
+    }
+    return out;
+  });
+  const filePath = path.join(outputDir, 'order_level_results.csv');
+  writeCsv(filePath, rows);
+  return filePath;
+}
+
 async function calculateCostToServe(organizationId) {
   const orders = await Order.findAll({
     where: { organization_id: organizationId }
@@ -141,14 +172,20 @@ async function calculateCostToServe(organizationId) {
     return { calculated: 0, error: true, message: 'No orders to calculate', missingFields: [{ entity: 'orders', field: null, message: 'No orders found. Upload orders sheet with at least one order.' }] };
   }
 
-  const [shipments, warehouseCosts, transportCosts] = await Promise.all([
+  const [shipments, warehouseCosts, transportCosts, dropSizeResults] = await Promise.all([
     Shipment.findAll({ where: { organization_id: organizationId } }),
     WarehouseCost.findAll({
       where: { organization_id: organizationId },
       order: [['effective_from', 'DESC NULLS LAST']]
     }),
-    TransportCost.findAll({ where: { organization_id: organizationId } })
+    TransportCost.findAll({ where: { organization_id: organizationId } }),
+    DropSizeResult.findAll({ where: { organization_id: organizationId } })
   ]);
+
+  const dropByOrderId = new Map();
+  for (const drop of dropSizeResults) {
+    dropByOrderId.set(drop.order_id, drop);
+  }
 
   const validationErrors = validateCalculationInputs(orders, shipments, warehouseCosts, transportCosts);
   if (validationErrors.length > 0) {
@@ -204,9 +241,8 @@ async function calculateCostToServe(organizationId) {
       let fuelSurchargePct = toFloat(tc.fuel_surcharge_pct);
       const fuelPercentage = fuelSurchargePct > 1 ? fuelSurchargePct / 100 : fuelSurchargePct; 
 
-      // Rule 1: Transport_Cost_Before_Min (Based on sample data exactly matching Base + chargeable variable cost)
-      const variableCost = Math.max(totalWeightKg * costPerKg, totalPallets * costPerPallet);
-      const transportCostBeforeMin = baseCost + variableCost;
+      const transportCostBeforeMin =
+        baseCost + (totalWeightKg * costPerKg) + (totalPallets * costPerPallet);
 
       // Rule 2: Apply Minimum Charge
       const transportCostAfterMin = Math.max(transportCostBeforeMin, minCharge);
@@ -316,6 +352,9 @@ async function calculateCostToServe(organizationId) {
     });
 
     const sid = order.get ? order.get('shipment_id') : order.shipment_id;
+    const analytics = resolveAnalyticFields(order, dropByOrderId);
+    const weightKg = Math.max(0, toFloat(order.get ? order.get('weight_kg') : order.weight_kg));
+
     ordersData.push({
       order_id: oid,
       customer_id: order.get ? order.get('customer_id') : order.customer_id,
@@ -323,15 +362,15 @@ async function calculateCostToServe(organizationId) {
       shipment_id: sid,
       route_id: order.get ? order.get('route_id') : order.route_id,
       quantity: Math.max(0, toFloat(order.get ? order.get('quantity') : order.quantity)),
-      revenue: revenue,
+      revenue,
       transport_cost: orderTransport,
       warehouse_cost: warehouseCost,
       cost_to_serve: costToServe,
-      profit: profit,
-      variable_cost_per_unit: toFloat(order.get ? order.get('variable_cost_per_unit') : order.variable_cost_per_unit),
-      fixed_cost: toFloat(order.get ? order.get('fixed_cost') : order.fixed_cost),
-      q_min: toFloat(order.get ? order.get('q_min') : order.q_min),
-      weight: toFloat(order.get ? order.get('weight_kg') : order.weight_kg),
+      profit,
+      variable_cost_per_unit: analytics.variable_cost_per_unit,
+      fixed_cost: analytics.fixed_cost,
+      q_min: analytics.q_min,
+      weight_kg: weightKg,
       shipment_transport_cost: (shipmentFinalTransport[sid] || {}).finalTransport || 0
     });
   }
@@ -341,24 +380,32 @@ async function calculateCostToServe(organizationId) {
     await CostResult.bulkCreate(rows);
   }
 
-  // STEP 5: Run aggregations and insights
+  const outputDir = path.join(process.cwd(), 'output');
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  console.log(`[CTS] Processed ${ordersData.length} order rows`);
+
   try {
-    const outputDir = path.join(process.cwd(), 'output');
-    
-    // Aggregations
-    const customerSummary = await generateCustomerSummary(ordersData, outputDir);
-    const skuSummary = await generateSkuSummary(ordersData, outputDir);
-    await generateRouteSummary(ordersData, outputDir);
-    await validateShipments(ordersData, outputDir);
-    
-    // Insights
-    await identifyUnprofitableCustomers(customerSummary, outputDir);
-    await identifyLowDropSizeCustomers(customerSummary, outputDir);
-    await identifyHighCostSkus(skuSummary, outputDir);
-    await generateMarginLeakage(ordersData, outputDir);
-    await generateTopOpportunities(ordersData, outputDir);
+    const orderLevelPath = writeOrderLevelResultsCsv(ordersData, outputDir);
+    console.log(`[CTS] order_level_results.csv generated: ${orderLevelPath}`);
+
+    const agg = await runAllAggregations(ordersData, outputDir);
+    console.log(`[CTS] customer_summary.csv generated (${agg.counts.customers} customers): ${agg.files.customer_summary}`);
+    console.log(`[CTS] sku_summary.csv generated (${agg.counts.skus} SKUs): ${agg.files.sku_summary}`);
+    console.log(`[CTS] route_summary.csv generated (${agg.counts.routes} routes): ${agg.files.route_summary}`);
+    console.log(`[CTS] shipment_validation.csv generated (${agg.counts.shipments} shipments): ${agg.files.shipment_validation}`);
+
+    const ins = await runAllInsights(agg.customerSummary, agg.skuSummary, ordersData, outputDir);
+    console.log('[CTS] Insights generated:');
+    console.log(`  - unprofitable_customers.csv (${ins.counts.unprofitable}): ${ins.files.unprofitable_customers}`);
+    console.log(`  - low_drop_size_customers.csv (${ins.counts.low_drop_size}): ${ins.files.low_drop_size_customers}`);
+    console.log(`  - high_cost_skus.csv (${ins.counts.high_cost_skus}): ${ins.files.high_cost_skus}`);
+    console.log(`  - margin_leakage.csv (${ins.counts.margin_leakage}): ${ins.files.margin_leakage}`);
+    console.log(`  - top_10_opportunities.csv (${ins.counts.top_opportunities}): ${ins.files.top_10_opportunities}`);
   } catch (err) {
-    console.error("Error generating aggregations and insights CSVs:", err);
+    console.error('[CTS] Error generating aggregations and insights CSVs:', err);
   }
 
   return { calculated: rows.length };

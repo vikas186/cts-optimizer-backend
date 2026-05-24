@@ -36,6 +36,7 @@ function generateRouteSummary(results, outputDir) {
       route_id: r.route_id,
       total_shipments: total_shipments,
       total_orders: r.total_orders,
+      total_quantity: r.total_quantity.toFixed(2),
       total_revenue: r.total_revenue.toFixed(2),
       total_cts: r.total_cts.toFixed(2),
       total_profit: total_profit.toFixed(2),

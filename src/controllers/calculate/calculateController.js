@@ -48,6 +48,7 @@ const runAll = async (req, res, next) => {
     if (!organizationId) {
       return res.status(400).json({ success: false, error: 'User organization not set.' });
     }
+    const dropResult = await dropSizeService.calculateDropSize(organizationId);
     const costResult = await costEngineService.calculateCostToServe(organizationId);
     if (costResult.error && costResult.missingFields?.length) {
       return res.status(400).json({
@@ -56,7 +57,6 @@ const runAll = async (req, res, next) => {
         missingFields: costResult.missingFields
       });
     }
-    const dropResult = await dropSizeService.calculateDropSize(organizationId);
     return res.status(200).json({
       success: true,
       message: 'Cost-to-serve and drop-size calculations completed.',

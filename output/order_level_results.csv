@@ -1,0 +1,4 @@
+order_id,customer_id,sku,shipment_id,route_id,quantity,revenue,transport_cost,warehouse_cost,cost_to_serve,profit,variable_cost_per_unit,fixed_cost,q_min
+O1001,C001,SKU_A,S001,R1,20,240,73.92,6.7,80.62,159.38,1.31,45,4.21
+O1002,C002,SKU_B,S001,R1,10,150,36.96,4.1,41.06,108.94,1.31,45,3.29
+O1003,C001,SKU_C,S002,R2,80,960,200.1,11.9,212,748,1.01,70,6.37

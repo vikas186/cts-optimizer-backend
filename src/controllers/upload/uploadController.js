@@ -22,9 +22,9 @@ const uploadExcel = async (req, res, next) => {
     let calcResults = {};
     if (result.success) {
       try {
-        const costRes = await costEngineService.calculateCostToServe(organizationId);
         const dropRes = await dropSizeService.calculateDropSize(organizationId);
-        calcResults = { costToServe: costRes.calculated, dropSize: dropRes.calculated };
+        const costRes = await costEngineService.calculateCostToServe(organizationId);
+        calcResults = { dropSize: dropRes.calculated, costToServe: costRes.calculated };
       } catch(err) {
         console.error('Auto-calculation failed:', err.message);
       }

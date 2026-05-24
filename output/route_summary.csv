@@ -1,0 +1,3 @@
+route_id,total_shipments,total_orders,total_quantity,total_revenue,total_cts,total_profit,avg_cost_per_shipment,avg_drop_size
+R1,1,2,30.00,390.00,121.68,268.32,121.68,30.00
+R2,1,1,80.00,960.00,212.00,748.00,212.00,80.00

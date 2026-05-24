@@ -56,7 +56,7 @@ function mapWarehouseCostRow(row, organizationId) {
   const pick = get('pick_cost_per_line', 'pick_cost');
   const pack = get('pack_cost_per_order', 'pack_cost');
   const pallet = get('pallet_handling_cost', 'pallet_han');
-  const storage = get('storage_cost_per_pallet_day', 'storage_co', 'storage_cost_per_day', 'storage_cost');
+  const storage = get('storage_cost_per_pallet_per_day', 'storage_cost_per_pallet_day', 'storage_co', 'storage_cost_per_day', 'storage_cost');
   if (pick === null && pack === null && pallet === null && storage === null) return null;
   return {
     organization_id: organizationId,
@@ -183,7 +183,10 @@ function mapOrderRow(row, organizationId) {
     lines: getInt('lines', 'line'),
     pallets: getNum('pallets', 'pallet'),
     storage_days: getInt('storage_days', 'storage', 'days'),
-    order_date: orderDate
+    order_date: orderDate,
+    q_min: getNum('q_min', 'min_order_qty', 'min_profitable_quantity'),
+    variable_cost_per_unit: getNum('variable_cost_per_unit', 'unit_variable_cost'),
+    fixed_cost: getNum('fixed_cost')
   };
 }
 

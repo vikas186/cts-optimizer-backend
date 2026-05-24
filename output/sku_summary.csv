@@ -1,0 +1,4 @@
+sku,total_revenue,total_cts,total_profit,margin_pct,total_quantity,cost_per_unit,avg_variable_cost_per_unit
+SKU_A,240.00,80.62,159.38,0.6641,20.00,4.03,1.31
+SKU_B,150.00,41.06,108.94,0.7263,10.00,4.11,1.31
+SKU_C,960.00,212.00,748.00,0.7792,80.00,2.65,1.01

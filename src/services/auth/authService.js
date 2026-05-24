@@ -8,7 +8,9 @@ const register = async (userData) => {
   // Check if user already exists
   const existingUser = await User.findOne({ where: { email } });
   if (existingUser) {
-    throw new Error('User already exists with this email');
+    const err = new Error('Email already registered');
+    err.statusCode = 400;
+    throw err;
   }
 
   // Create a new organization for this user (one org per signup)

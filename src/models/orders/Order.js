@@ -77,6 +77,18 @@ const Order = sequelize.define('Order', {
   order_date: {
     type: DataTypes.DATEONLY,
     allowNull: true
+  },
+  q_min: {
+    type: DataTypes.FLOAT,
+    allowNull: true
+  },
+  variable_cost_per_unit: {
+    type: DataTypes.FLOAT,
+    allowNull: true
+  },
+  fixed_cost: {
+    type: DataTypes.FLOAT,
+    allowNull: true
   }
 }, {
   tableName: 'orders',

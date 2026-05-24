@@ -1,54 +1,59 @@
 const path = require('path');
 const { writeCsv } = require('../utils/csvWriter');
+const { roundMoney } = require('../utils/mathHelpers');
 
 function validateShipments(results, outputDir) {
   const shipmentMap = new Map();
 
   for (const row of results) {
     const sid = row.shipment_id;
+    if (!sid) continue;
     if (!shipmentMap.has(sid)) {
       shipmentMap.set(sid, {
         shipment_id: sid,
+        shipment_total_cts: 0,
         allocated_cost: 0,
+        shipment_total_weight: 0,
+        shipment_total_quantity: 0,
         expected_cost: null
       });
     }
 
     const s = shipmentMap.get(sid);
+    s.shipment_total_cts += parseFloat(row.cost_to_serve) || 0;
     s.allocated_cost += parseFloat(row.transport_cost) || 0;
-    
-    // If the data has shipment_transport_cost at order level, just take the first valid one we see
-    if (row.shipment_transport_cost !== undefined && row.shipment_transport_cost !== null && row.shipment_transport_cost !== '') {
-        s.expected_cost = parseFloat(row.shipment_transport_cost) || 0;
+    s.shipment_total_weight += parseFloat(row.weight_kg) || 0;
+    s.shipment_total_quantity += parseFloat(row.quantity) || 0;
+
+    if (row.shipment_transport_cost != null && row.shipment_transport_cost !== '') {
+      s.expected_cost = parseFloat(row.shipment_transport_cost) || 0;
     }
   }
 
   const outputRows = [];
   for (const s of shipmentMap.values()) {
-    // If expected_cost is not available, we can't properly validate. 
-    // We will set variance to 0 and expected_cost to empty
-    let expected = s.expected_cost;
-    let variance = 0;
+    const expected = s.expected_cost != null ? s.expected_cost : 0;
+    const variance = s.allocated_cost - expected;
     let status = 'CHECK';
 
-    if (expected !== null) {
-      variance = s.allocated_cost - expected;
-      // if abs(variance) <= 1% of expected_cost -> "OK"
-      const threshold = expected * 0.01;
-      if (Math.abs(variance) <= Math.abs(threshold)) {
+    if (expected === 0 && s.allocated_cost === 0) {
+      status = 'OK';
+    } else if (expected !== 0) {
+      const threshold = Math.abs(expected) * 0.01;
+      if (Math.abs(variance) <= threshold) {
         status = 'OK';
       }
-    } else {
-      expected = '';
-      variance = '';
     }
 
     outputRows.push({
       shipment_id: s.shipment_id,
-      allocated_cost: s.allocated_cost.toFixed(2),
-      expected_cost: expected !== '' ? expected.toFixed(2) : '',
-      variance: variance !== '' ? variance.toFixed(2) : '',
-      status: status
+      shipment_total_cts: roundMoney(s.shipment_total_cts).toFixed(2),
+      allocated_cost: roundMoney(s.allocated_cost).toFixed(2),
+      shipment_total_weight: roundMoney(s.shipment_total_weight).toFixed(2),
+      shipment_total_quantity: roundMoney(s.shipment_total_quantity).toFixed(2),
+      expected_cost: s.expected_cost != null ? roundMoney(expected).toFixed(2) : '',
+      variance: s.expected_cost != null ? roundMoney(variance).toFixed(2) : '',
+      status
     });
   }
 
